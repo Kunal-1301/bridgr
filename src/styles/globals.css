@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bridgr-primary-800: theme(colors.primary.800);
+    --bridgr-primary-600: theme(colors.primary.600);
+    --bridgr-primary-400: theme(colors.primary.400);
+    --bridgr-accent-500: theme(colors.accent.500);
+    --bridgr-neutral-900: theme(colors.neutral.900);
+    --bridgr-neutral-600: theme(colors.neutral.600);
+    --bridgr-neutral-200: theme(colors.neutral.200);
+    --bridgr-neutral-50: theme(colors.neutral.50);
+    --bridgr-success: theme(colors.success.DEFAULT);
+    --bridgr-warning: theme(colors.warning.DEFAULT);
+    --bridgr-error: theme(colors.error.DEFAULT);
+    --bridgr-info: theme(colors.info.DEFAULT);
+  }
+
+  html {
+    min-height: 100%;
+    background: theme(colors.neutral.50);
+    font-family: Geist, system-ui, sans-serif;
+    color: theme(colors.neutral.900);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply min-h-screen bg-neutral-50 text-body text-neutral-900;
+    margin: 0;
+  }
+
+  #root {
+    min-height: 100svh;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply text-neutral-900;
+    margin: 0;
+    letter-spacing: 0;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  code,
+  kbd,
+  samp,
+  pre {
+    @apply font-mono;
+  }
+
+  code {
+    @apply rounded-sm bg-primary-50 px-1.5 py-0.5 text-caption text-primary-800;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-neutral-50;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-primary-800/25 transition-colors hover:bg-primary-800/45;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply border border-white/40 bg-white/75 shadow-sm backdrop-blur-md;
+  }
+
+  .bridgr-arc {
+    position: relative;
+  }
+
+  .bridgr-arc::before,
+  .bridgr-arc::after {
+    content: '';
+    position: absolute;
+    border-radius: 9999px;
+  }
+
+  .bridgr-arc::before {
+    inset: 18%;
+    border: 2px solid rgba(240, 165, 0, .58);
+    border-left-color: transparent;
+    border-bottom-color: transparent;
+    animation: bridgr-arc-spin 5.5s linear infinite;
+  }
+
+  .bridgr-arc::after {
+    height: 14px;
+    width: 14px;
+    left: 18%;
+    bottom: 28%;
+    background: theme(colors.accent.500);
+    box-shadow: 190px -128px 0 theme(colors.primary.400);
+    animation: bridgr-node-pulse 1.8s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes bridgr-arc-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bridgr-node-pulse {
+  from {
+    opacity: .72;
+    transform: scale(.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
