@@ -157,7 +157,7 @@ export const WorkerOnboardingPage = () => {
       setErrors({})
       return true
     }
-    setErrors(issueMap(result.error))
+    setErrors(issueMap((result as { success: false; error: Parameters<typeof issueMap>[0] }).error))
     return false
   }
 
