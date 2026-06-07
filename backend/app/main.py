@@ -1,4 +1,5 @@
-from time import perf_counter
+from collections import defaultdict, deque
+from time import perf_counter, time
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,8 +9,34 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.errors import AppError
 
+_auth_attempts: defaultdict[str, deque[float]] = defaultdict(deque)
+
+
+def _client_ip(request: Request) -> str:
+    if forwarded_for := request.headers.get("x-forwarded-for"):
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _init_sentry() -> None:
+    if not settings.SENTRY_DSN:
+        return
+
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.ENVIRONMENT,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        integrations=[FastApiIntegration(), SqlalchemyIntegration()],
+    )
+
 
 def create_app() -> FastAPI:
+    _init_sentry()
+
     app = FastAPI(
         title=settings.APP_NAME,
         version="0.1.0",
@@ -25,6 +52,30 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def security_limits_middleware(request: Request, call_next):
+        content_length = request.headers.get("content-length")
+        if content_length and content_length.isdigit() and int(content_length) > settings.MAX_REQUEST_BODY_BYTES:
+            return JSONResponse(
+                status_code=413,
+                content={"detail": "Request body too large", "code": "request_body_too_large"},
+            )
+
+        if request.url.path.startswith("/api/v1/auth/"):
+            now = time()
+            key = f"{_client_ip(request)}:{request.url.path}"
+            attempts = _auth_attempts[key]
+            while attempts and now - attempts[0] > settings.AUTH_RATE_LIMIT_WINDOW_SECONDS:
+                attempts.popleft()
+            if len(attempts) >= settings.AUTH_RATE_LIMIT_REQUESTS:
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": "Too many authentication attempts", "code": "rate_limited"},
+                )
+            attempts.append(now)
+
+        return await call_next(request)
 
     if settings.is_dev:
         @app.middleware("http")

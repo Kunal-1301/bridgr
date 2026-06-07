@@ -36,6 +36,7 @@ def _set_refresh_cookie(response: JSONResponse, token: str) -> JSONResponse:
         samesite=settings.cookie_same_site,
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         path="/",
+        domain=settings.REFRESH_COOKIE_DOMAIN,
     )
     return response
 
@@ -75,6 +76,7 @@ async def logout(user: CurrentUser, request: Request, db: DbSession) -> dict:
         path="/",
         secure=settings.cookie_secure,
         samesite=settings.cookie_same_site,
+        domain=settings.REFRESH_COOKIE_DOMAIN,
     )
     return response
 

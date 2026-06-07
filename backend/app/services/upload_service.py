@@ -17,6 +17,7 @@ ALLOWED_MIME_TYPES: frozenset[str] = frozenset(
 )
 
 _MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+UPLOAD_CATEGORIES: frozenset[str] = frozenset(settings.storage_buckets.keys())
 
 
 @lru_cache(maxsize=1)
@@ -48,6 +49,11 @@ class UploadService:
         safe = filename.replace(" ", "_")
         return f"projects/{project_id}/files/{uuid4()}-{safe}"
 
+    @staticmethod
+    def category_key(category: str, filename: str) -> str:
+        safe = filename.replace(" ", "_")
+        return f"{category}/{uuid4()}-{safe}"
+
     # ── Validation ──────────────────────────────────────────────
 
     @staticmethod
@@ -63,6 +69,15 @@ class UploadService:
                 f"File too large ({size / 1_048_576:.1f} MB). Maximum is 10 MB.",
                 413,
                 "file_too_large",
+            )
+
+    @staticmethod
+    def validate_category(category: str) -> None:
+        if category not in UPLOAD_CATEGORIES:
+            raise AppError(
+                f"Unsupported upload category '{category}'.",
+                422,
+                "unsupported_upload_category",
             )
 
     # ── Upload ──────────────────────────────────────────────────
@@ -91,7 +106,7 @@ class UploadService:
 
     # ── Signed URL ──────────────────────────────────────────────
 
-    async def signed_url(self, key: str, expires_in: int = 3600) -> str:
+    async def signed_url(self, key: str, expires_in: int = 3600, bucket: str | None = None) -> str:
         client = _s3_client()
         if not client:
             return f"https://storage.bridgr.dev/{key}"
@@ -99,8 +114,53 @@ class UploadService:
         def _sign() -> str:
             return client.generate_presigned_url(
                 "get_object",
-                Params={"Bucket": settings.R2_BUCKET_NAME, "Key": key},
+                Params={"Bucket": bucket or settings.R2_BUCKET_NAME, "Key": key},
                 ExpiresIn=expires_in,
             )
 
         return await asyncio.to_thread(_sign)
+
+    async def presign_upload(
+        self,
+        filename: str,
+        content_type: str,
+        category: str,
+        size: int,
+        expires_in: int = 900,
+    ) -> dict:
+        self.validate_category(category)
+        self.validate(content_type, size)
+
+        client = _s3_client()
+        key = self.category_key(category, filename)
+        bucket = settings.storage_buckets[category]
+
+        if not client:
+            return {
+                "uploadUrl": f"https://storage.bridgr.dev/{key}",
+                "downloadUrl": f"https://storage.bridgr.dev/{key}",
+                "method": "PUT",
+                "bucket": bucket,
+                "key": key,
+                "headers": {"Content-Type": content_type},
+                "expiresIn": expires_in,
+            }
+
+        def _sign_put() -> str:
+            return client.generate_presigned_url(
+                "put_object",
+                Params={"Bucket": bucket, "Key": key, "ContentType": content_type},
+                ExpiresIn=expires_in,
+            )
+
+        upload_url = await asyncio.to_thread(_sign_put)
+        download_url = await self.signed_url(key, bucket=bucket)
+        return {
+            "uploadUrl": upload_url,
+            "downloadUrl": download_url,
+            "method": "PUT",
+            "bucket": bucket,
+            "key": key,
+            "headers": {"Content-Type": content_type},
+            "expiresIn": expires_in,
+        }

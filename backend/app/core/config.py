@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     JWT_REFRESH_SECRET: str = "change-me-refresh-secret"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 14
+    REFRESH_COOKIE_DOMAIN: str | None = None
     EMAIL_VERIFICATION_TOKEN_EXPIRE_HOURS: int = 24
     PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 1
     FRONTEND_URL: str = "http://localhost:5173"
@@ -20,6 +21,11 @@ class Settings(BaseSettings):
     CORS_ORIGIN_REGEX: str | None = None
     SECURE_COOKIE_SECURE: bool | None = None
     SECURE_COOKIE_SAME_SITE: str | None = None
+    MAX_REQUEST_BODY_BYTES: int = 10 * 1024 * 1024
+    AUTH_RATE_LIMIT_REQUESTS: int = 20
+    AUTH_RATE_LIMIT_WINDOW_SECONDS: int = 60
+    SENTRY_DSN: str | None = None
+    SENTRY_TRACES_SAMPLE_RATE: float = 0.1
 
     ADMIN_EMAIL: str | None = None
     ADMIN_PASSWORD: str | None = None
@@ -30,10 +36,19 @@ class Settings(BaseSettings):
     R2_ACCESS_KEY_ID: str | None = None
     R2_SECRET_ACCESS_KEY: str | None = None
     R2_BUCKET_NAME: str = "bridgr"
+    R2_WORKER_RESUMES_BUCKET: str | None = None
+    R2_WORKER_ID_PROOFS_BUCKET: str | None = None
+    R2_PORTFOLIO_FILES_BUCKET: str | None = None
+    R2_PROJECT_FILES_BUCKET: str | None = None
+    R2_INVOICES_BUCKET: str | None = None
     R2_PUBLIC_BASE_URL: str | None = None
     R2_ENDPOINT_URL: str | None = None
 
     RESEND_API_KEY: str | None = None
+    RESEND_FROM_EMAIL: str | None = None
+    RAZORPAY_KEY_ID: str | None = None
+    RAZORPAY_KEY_SECRET: str | None = None
+    POSTHOG_PROJECT_API_KEY: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=True)
 
@@ -47,6 +62,7 @@ class Settings(BaseSettings):
     @field_validator(
         "VERCEL_FRONTEND_URL",
         "CORS_ORIGIN_REGEX",
+        "REFRESH_COOKIE_DOMAIN",
         "SECURE_COOKIE_SECURE",
         "SECURE_COOKIE_SAME_SITE",
         "ADMIN_EMAIL",
@@ -56,7 +72,17 @@ class Settings(BaseSettings):
         "R2_SECRET_ACCESS_KEY",
         "R2_ENDPOINT_URL",
         "R2_PUBLIC_BASE_URL",
+        "R2_WORKER_RESUMES_BUCKET",
+        "R2_WORKER_ID_PROOFS_BUCKET",
+        "R2_PORTFOLIO_FILES_BUCKET",
+        "R2_PROJECT_FILES_BUCKET",
+        "R2_INVOICES_BUCKET",
         "RESEND_API_KEY",
+        "RESEND_FROM_EMAIL",
+        "RAZORPAY_KEY_ID",
+        "RAZORPAY_KEY_SECRET",
+        "POSTHOG_PROJECT_API_KEY",
+        "SENTRY_DSN",
         mode="before",
     )
     @classmethod
@@ -94,7 +120,18 @@ class Settings(BaseSettings):
 
     @property
     def cookie_same_site(self) -> str:
-        return self.SECURE_COOKIE_SAME_SITE or ("none" if self.is_production else "lax")
+        return self.SECURE_COOKIE_SAME_SITE or "lax"
+
+    @property
+    def storage_buckets(self) -> dict[str, str]:
+        default = self.R2_BUCKET_NAME
+        return {
+            "worker-resumes": self.R2_WORKER_RESUMES_BUCKET or default,
+            "worker-id-proofs": self.R2_WORKER_ID_PROOFS_BUCKET or default,
+            "portfolio-files": self.R2_PORTFOLIO_FILES_BUCKET or default,
+            "project-files": self.R2_PROJECT_FILES_BUCKET or default,
+            "invoices": self.R2_INVOICES_BUCKET or default,
+        }
 
     @staticmethod
     def _with_scheme(origin: str) -> str:
